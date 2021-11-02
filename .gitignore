@@ -1,0 +1,6 @@
+myvenv/
+db.sqlite3
+__pycache__/
+*.pyc
+credentials.json
+config/settings.py
