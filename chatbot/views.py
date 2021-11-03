@@ -2,6 +2,7 @@ from rest_framework import viewsets
 from .serializers import WelfareSerializer
 from .models import Welfare
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 
 # viewset으로 CRUD 자동 구현
 class WelfareViewSet(viewsets.ModelViewSet):
@@ -31,6 +32,7 @@ def beautifulsoupTest(request):
 
 
 # dialogflow client 코드
+# HTTP Body : JSON => {"texts":["text1","text2"]}
 def detect_intent_texts(project_id, session_id, texts, language_code):
     from google.cloud import dialogflow
 
@@ -49,25 +51,38 @@ def detect_intent_texts(project_id, session_id, texts, language_code):
             request={"session": session, "query_input": query_input}
         )
 
-        print("=" * 20)
-        print(f"Query text: {response.query_result.query_text}")
+        print("=" * 100 + "\n")
+        print(f"=> Query text: {response.query_result.query_text}")
         print(
-            f"Detected intent: {response.query_result.intent.display_name} (confidence: {response.query_result.intent_detection_confidence})\n"
+            f"=> Detected intent: {response.query_result.intent.display_name} (confidence: {response.query_result.intent_detection_confidence})"
         )
-        print(f"Fulfillment text: {response.query_result.fulfillment_text}\n")
+        print(f"=> Fulfillment text: {response.query_result.fulfillment_text} \n")
+        print("=" * 100)
         results.append(response.query_result.fulfillment_text)
     return results
 
 
 # dialogflow 테스트
 # 환경변수 GOOGLE_APPLICATION_CREDENTIALS 등록하면 Cloud SDK가 알아서 사용자 계정으로 인증처리 하는 거 같음
+@csrf_exempt
 def dialogflowTest(request):
     import random
+    import json
+
+    # 예시
+    """
+    texts필드에 []형태로 넘겨야함
+    {
+        "texts" : ["I know french", "I know English"]
+    }
+    """
+    inputRawText = request.body
+    inputText = json.loads(inputRawText)["texts"]
 
     PROJECT_ID = "dialogflow-test-330305"
     SESSION_ID = f"session{str(random.randint(1, 1000000))}"
-    inputTexts = ["I know french", "I know English"]
     LANGUAGE_CODE = "en-US"
 
-    resultTexts = detect_intent_texts(PROJECT_ID, SESSION_ID, inputTexts, LANGUAGE_CODE)
-    return JsonResponse({"input texts": inputTexts, "result texts": resultTexts})
+    resultTexts = detect_intent_texts(PROJECT_ID, SESSION_ID, inputText, LANGUAGE_CODE)
+
+    return JsonResponse({"input texts": inputText, "result texts": resultTexts})
