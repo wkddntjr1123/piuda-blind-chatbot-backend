@@ -1,8 +1,11 @@
 from rest_framework import viewsets
+
+from config.settings import BASE_DIR
 from .serializers import WelfareSerializer
 from .models import Welfare
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
 
 # viewset으로 CRUD 자동 구현
 class WelfareViewSet(viewsets.ModelViewSet):
@@ -33,13 +36,15 @@ def beautifulsoupTest(request):
 
 # dialogflow client 코드
 # HTTP Body : JSON => {"texts":["text1","text2"]}
-def detect_intent_texts(project_id, session_id, texts, language_code):
+def detect_intent_texts(project_id, location_id, session_id, texts, language_code):
     from google.cloud import dialogflow
 
     # 동일한 세션ID로 통신을 하면 지속적인 대화가 가능하다. (약 20분 유지)
     # 따라서 동일한 세션ID를 여러 사용자가 사용X
-    session_client = dialogflow.SessionsClient()
-    session = session_client.session_path(project_id, session_id)
+    session_client = dialogflow.SessionsClient(
+        client_options={"api_endpoint": f"{location_id}-dialogflow.googleapis.com"}
+    )
+    session = f"projects/{project_id}/locations/{location_id}/agent/sessions/{session_id}"
     print(f"Session path: {session}")
 
     results = []
@@ -66,9 +71,18 @@ def detect_intent_texts(project_id, session_id, texts, language_code):
 # 환경변수 GOOGLE_APPLICATION_CREDENTIALS 등록하면 Cloud SDK가 알아서 사용자 계정으로 인증처리 하는 거 같음
 @csrf_exempt
 def dialogflowTest(request):
-    import random
-    import json
+    import json, os, uuid
 
+    credentials = os.path.join(BASE_DIR, "credentials.json")
+    # GOOGLE_APPLICATION_CREDENTIALS 환경변수 등록
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials
+
+    # 쿠키에 세션 정보 있으면 해당 세션값 사용
+    if request.COOKIES.get("session"):
+        SESSION_ID = request.COOKIES.get("session")
+    # 쿠키에 세션 정보 없으면 새로운 세션갑 설정
+    else:
+        SESSION_ID = uuid.uuid4()
     # 예시
     """
     texts필드에 []형태로 넘겨야함
@@ -76,13 +90,23 @@ def dialogflowTest(request):
         "texts" : ["I know french", "I know English"]
     }
     """
+    # body에 실려온 json
     inputRawText = request.body
+    # json to dict
     inputText = json.loads(inputRawText)["texts"]
 
     PROJECT_ID = "dialogflow-test-330305"
-    SESSION_ID = f"session{str(random.randint(1, 1000000))}"
     LANGUAGE_CODE = "en-US"
+    LOCATION_ID = "asia-northeast1"
+    import datetime
 
-    resultTexts = detect_intent_texts(PROJECT_ID, SESSION_ID, inputText, LANGUAGE_CODE)
+    now = datetime.datetime.now()
+    resultTexts = detect_intent_texts(PROJECT_ID, LOCATION_ID, SESSION_ID, inputText, LANGUAGE_CODE)
+    print(datetime.datetime.now() - now)
 
-    return JsonResponse({"input texts": inputText, "result texts": resultTexts})
+    response = JsonResponse({"input texts": inputText, "result texts": resultTexts})
+    # 쿠키 설정 : {"session":SESSION_ID값}, 유지시간 20분
+
+    response.set_cookie(key="session", value=SESSION_ID, max_age=1200)
+
+    return response
