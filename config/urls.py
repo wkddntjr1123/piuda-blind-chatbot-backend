@@ -2,7 +2,7 @@ from django.conf.urls import include
 from django.contrib import admin
 from django.urls import path
 from rest_framework import routers
-from chatbot.views import WelfareViewSet, beautifulsoupTest, dialogflowTest
+from chatbot.views import WelfareViewSet, beautifulsoupTest, dialogflowTest, testing
 
 # DRF는 url을 자동으로 매핑해주는 router를 제공
 routers = routers.DefaultRouter()
@@ -13,4 +13,5 @@ urlpatterns = [
     path("", include(routers.urls)),
     path("bstest/", beautifulsoupTest),
     path("dftest/", dialogflowTest),
+    path("test/", testing),
 ]

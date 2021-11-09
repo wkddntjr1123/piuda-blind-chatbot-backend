@@ -1,8 +1,9 @@
+import json
 from rest_framework import viewsets
 
 from config.settings import BASE_DIR
 from .serializers import WelfareSerializer
-from .models import Welfare
+from .models import Classification, Welfare
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -95,8 +96,8 @@ def dialogflowTest(request):
     # json to dict
     inputText = json.loads(inputRawText)["texts"]
 
-    PROJECT_ID = "dialogflow-test-330305"
-    LANGUAGE_CODE = "en-US"
+    PROJECT_ID = "welfare-chat-gm9e"
+    LANGUAGE_CODE = "ko"
     LOCATION_ID = "asia-northeast1"
     import datetime
 
@@ -110,3 +111,22 @@ def dialogflowTest(request):
     response.set_cookie(key="session", value=SESSION_ID, max_age=1200)
 
     return response
+
+
+def testing(request):
+    import os
+
+    data = json.load(
+        open(
+            os.path.join(
+                BASE_DIR,
+                "data.json",
+            ),
+            encoding="utf8",
+        )
+    )
+    data2 = data.get("__collections__").get("member")
+    for item in data2:
+        rawData = data2[item]
+        print(rawData["WLFARE_INFO_NM"])
+    return JsonResponse({"...": "ㅠㅠ"})
