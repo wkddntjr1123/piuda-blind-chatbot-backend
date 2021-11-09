@@ -37,7 +37,7 @@ def beautifulsoupTest(request):
 
 # dialogflow client 코드
 # HTTP Body : JSON => {"texts":["text1","text2"]}
-def detect_intent_texts(project_id, location_id, session_id, texts, language_code):
+def detect_intent_texts(project_id, location_id, session_id, text, language_code):
     from google.cloud import dialogflow
 
     # 동일한 세션ID로 통신을 하면 지속적인 대화가 가능하다. (약 20분 유지)
@@ -49,22 +49,22 @@ def detect_intent_texts(project_id, location_id, session_id, texts, language_cod
     print(f"Session path: {session}")
 
     results = []
-    for text in texts:
-        text_input = dialogflow.TextInput(text=text, language_code=language_code)
-        query_input = dialogflow.QueryInput(text=text_input)
 
-        response = session_client.detect_intent(
-            request={"session": session, "query_input": query_input}
-        )
+    text_input = dialogflow.TextInput(text=text, language_code=language_code)
+    query_input = dialogflow.QueryInput(text=text_input)
 
-        print("=" * 100 + "\n")
-        print(f"=> Query text: {response.query_result.query_text}")
-        print(
-            f"=> Detected intent: {response.query_result.intent.display_name} (confidence: {response.query_result.intent_detection_confidence})"
-        )
-        print(f"=> Fulfillment text: {response.query_result.fulfillment_text} \n")
-        print("=" * 100)
-        results.append(response.query_result.fulfillment_text)
+    response = session_client.detect_intent(
+        request={"session": session, "query_input": query_input}
+    )
+
+    print("=" * 100 + "\n")
+    print(f"=> Query text: {response.query_result.query_text}")
+    print(
+        f"=> Detected intent: {response.query_result.intent.display_name} (confidence: {response.query_result.intent_detection_confidence})"
+    )
+    print(f"=> Fulfillment text: {response.query_result.fulfillment_text} \n")
+    print("=" * 100)
+    results.append(response.query_result.fulfillment_text)
     return results
 
 
