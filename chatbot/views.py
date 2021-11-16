@@ -8,9 +8,10 @@ from django.conf import settings
 import requests
 from bs4 import BeautifulSoup as bs
 from google.cloud import dialogflow
-from google.protobuf.json_format import MessageToDict
 import json, os
-from time import sleep, time
+from time import sleep
+from proto import Message
+from django.forms.models import model_to_dict
 
 # viewset으로 CRUD 자동 구현
 class WelfareViewSet(viewsets.ModelViewSet):
@@ -46,7 +47,7 @@ def detect_intent_texts(project_id, location_id, session_id, text, language_code
         client_options={"api_endpoint": f"{location_id}-dialogflow.googleapis.com"}
     )
     session = f"projects/{project_id}/locations/{location_id}/agent/sessions/{session_id}"
-    print(f"Session path: {session}")
+    # print(f"Session path: {session}")
 
     text_input = dialogflow.TextInput(text=text, language_code=language_code)
     query_input = dialogflow.QueryInput(text=text_input)
@@ -55,7 +56,34 @@ def detect_intent_texts(project_id, location_id, session_id, text, language_code
         request={"session": session, "query_input": query_input}
     )
 
-    return response.query_result.fulfillment_text
+    dict_response = Message.to_dict(response)
+    fulfillment_text = dict_response.get("query_result").get("fulfillment_text")
+
+    query_response = None
+    if "추천" in fulfillment_text and "정보" in fulfillment_text:
+        params = dict_response.get("query_result").get("output_contexts")[0].get("parameters")
+        ageValue = int(params.get("age")[0])
+        area = params.get("area")[0]
+        interest = params.get("interest")[0]
+        print(f"result : {ageValue}, {area}, {interest}")
+        if ageValue <= 5:
+            age = 0
+        elif ageValue <= 12:
+            age = 1
+        elif ageValue <= 18:
+            age = 2
+        elif ageValue <= 39:
+            age = 3
+        elif ageValue <= 64:
+            age = 4
+        else:
+            age = 5
+        # 순서 변경하려면 orderBy추가 필요
+        query_response = Welfare.objects.filter(
+            age__contains=str(age), address__contains=area, interest__contains=interest
+        ).first()
+
+    return fulfillment_text, query_response
 
 
 # dialogflow 테스트
@@ -74,12 +102,14 @@ def dialogflowTest(request):
     LANGUAGE_CODE = "ko"
     LOCATION_ID = "asia-northeast1"
 
-    resultTexts = detect_intent_texts(PROJECT_ID, LOCATION_ID, SESSION_ID, inputText, LANGUAGE_CODE)
-    response = JsonResponse(
-        {"input texts": inputText, "result texts": resultTexts, "sessionId": SESSION_ID}
+    resultTexts, resultData = detect_intent_texts(
+        PROJECT_ID, LOCATION_ID, SESSION_ID, inputText, LANGUAGE_CODE
     )
+    response = {"input texts": inputText, "result texts": resultTexts, "sessionId": SESSION_ID}
+    if resultData is not None:
+        response.update({"resultData": (model_to_dict(resultData))})
 
-    return response
+    return JsonResponse(response)
 
 
 def createAllWelfareData(request):
