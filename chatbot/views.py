@@ -32,22 +32,47 @@ def beautifulsoupTest(request):
     else:
         print(response.status_code)
 
-    crollingData = soup.select_one(".grade-modal > div > .modal-content").text
+    crollingData = soup.select(".subject")
 
     return JsonResponse({"crolling data": crollingData})
 
 
-# dialogflow client 코드
-# HTTP Body : JSON => {"texts":["text1","text2"]}
-def detect_intent_texts(project_id, location_id, session_id, text, language_code):
+# 보건복지부 보건복지상담센터 : FAQ 크롤링
+def crolling123GoKr(request):
+    # 보건의료
+    URL1 = "http://129.go.kr/faq/faq01.jsp"
+    # 사회복지
+    URL2 = "http://129.go.kr/faq/faq02.jsp"
+    # 인구아동
+    URL3 = "http://129.go.kr/faq/faq03.jsp"
+    # 위기대응
+    URL4 = "http://129.go.kr/faq/faq04.jsp"
+    # 노인장애인
+    URL5 = "http://129.go.kr/faq/faq05.jsp"
+    page = int(1)
+    queryParam = f"?page={page}&menu=1&tid=1&kind=0&table_id2=ZZZ"
 
+    response = requests.get(URL1 + queryParam)
+    if response.status_code == 200:
+        html = response.text
+        soup = bs(html, "html.parser")
+    else:
+        print(response.status_code)
+
+    crollingData = soup.select(".subject>a")
+    for item in crollingData:
+        print(item["href"])
+    # crollingData = soup.select_one(".grade-modal > div > .modal-content").text
+
+    return JsonResponse({"crolling data": "123"})
+
+
+def detect_intent_texts(project_id, location_id, session_id, text, language_code):
     # 동일한 세션ID로 통신을 하면 지속적인 대화가 가능하다. (약 20분 유지)
-    # 따라서 동일한 세션ID를 여러 사용자가 사용X
     session_client = dialogflow.SessionsClient(
         client_options={"api_endpoint": f"{location_id}-dialogflow.googleapis.com"}
     )
     session = f"projects/{project_id}/locations/{location_id}/agent/sessions/{session_id}"
-    # print(f"Session path: {session}")
 
     text_input = dialogflow.TextInput(text=text, language_code=language_code)
     query_input = dialogflow.QueryInput(text=text_input)
@@ -55,39 +80,96 @@ def detect_intent_texts(project_id, location_id, session_id, text, language_code
     response = session_client.detect_intent(
         request={"session": session, "query_input": query_input}
     )
-
+    # dialogflow의 결과를 dict로 변환
     dict_response = Message.to_dict(response)
     fulfillment_text = dict_response.get("query_result").get("fulfillment_text")
 
     query_response = None
+    responseData = None
+    # "추천해드리는 복지 정보는 다음과 같습니다" => 결과오브젝트 함께 리턴
     if "추천" in fulfillment_text and "정보" in fulfillment_text:
         params = dict_response.get("query_result").get("output_contexts")[0].get("parameters")
-        ageValue = int(params.get("age")[0])
+        ageValue = params.get("age")[0]
         area = params.get("area")[0]
         interest = params.get("interest")[0]
-        print(f"result : {ageValue}, {area}, {interest}")
-        if ageValue <= 5:
-            age = 0
-        elif ageValue <= 12:
-            age = 1
-        elif ageValue <= 18:
-            age = 2
-        elif ageValue <= 39:
-            age = 3
-        elif ageValue <= 64:
-            age = 4
+
+        URL = "https://www.bokjiro.go.kr/ssis-teu/TWAT52005M/twataa/wlfareInfo/selectWlfareInfo.do"
+        headers = {
+            "Host": "www.bokjiro.go.kr",
+            "Content-Type": "application/json; charset=UTF-8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36",
+        }
+        requestBody = {
+            "dmSearchParam": {
+                "page": "1",
+                "onlineYn": "",
+                "searchTerm": "",
+                "tabId": "1",
+                "orderBy": "date",
+                "bkjrLftmCycCd": "",
+                "daesang": "",
+                "period": "",
+                "age": ageValue,
+                "region": area,
+                "jjim": "",
+                "subject": "",
+                "favoriteKeyword": "Y",
+                "sido": "",
+                "gungu": "",
+                "endYn": "",
+            },
+            "menuParam": {
+                "mnuId": "",
+                "pgmId": "",
+                "wlfareInfoId": "",
+                "scrnCmpntId": "",
+                "curScrId": "",
+            },
+            "dmScr": {"curScrId": "teu/app/twat/twata/twataa/TWAT52005M"},
+        }
+        interestDomain = [
+            "신체건강",
+            "정신건강",
+            "생활지원",
+            "주거",
+            "일자리",
+            "문화·여가",
+            "안전·위기",
+            "임신·출산",
+            "보육",
+            "교육",
+            "임신·위탁",
+            "보호·돌봄",
+            "서민금융",
+            "법률",
+        ]
+        # 사용자가 말한 관심주제가 관심주제에 있으면, 관심주제로
+        if interest in interestDomain:
+            requestBody["dmSearchParam"]["subject"] = interest
+        # 사용자가 말한 관심주제가 관심주제에 없으면, 키워드로
         else:
-            age = 5
-        # 순서 변경하려면 orderBy추가 필요
-        query_response = Welfare.objects.filter(
-            age__contains=str(age), address__contains=area, interest__contains=interest
-        ).first()
+            requestBody["dmSearchParam"]["searchTerm"] = interest
 
-    return fulfillment_text, query_response
+        responseData = json.loads(
+            requests.post(URL, headers=headers, data=json.dumps(requestBody)).text
+        )
+        # 중앙부처 데이터
+        centralData = responseData.get("dsServiceList1")
+        # 지자체 데이터
+        localData = responseData.get("dsServiceList2")
+
+        # 중앙부처 데이터가 존재하면 중앙부처 데이터 리턴
+        if len(centralData):
+            return fulfillment_text, centralData[0]
+        # 중앙부처 데이터 없으면 지자체 데이터 리턴
+        else:
+            return fulfillment_text, localData[0]
+    return fulfillment_text, responseData
 
 
-# dialogflow 테스트
-# 환경변수 GOOGLE_APPLICATION_CREDENTIALS 등록하면 Cloud SDK가 알아서 사용자 계정으로 인증처리 하는 거 같음
+# 환경변수 GOOGLE_APPLICATION_CREDENTIALS 등록하면 Google Cloud SDK가 알아서 사용자 계정으로 인증처리
+# input : {"texts":"내용", "sessionId":"세션ID"}
+# output : {"input texts":"입력내용", "result texts":"결과내용", "sessionId":"세션ID", "resultData":{최종결과오브젝트})
 @csrf_exempt
 def dialogflowTest(request):
 
@@ -106,12 +188,14 @@ def dialogflowTest(request):
         PROJECT_ID, LOCATION_ID, SESSION_ID, inputText, LANGUAGE_CODE
     )
     response = {"input texts": inputText, "result texts": resultTexts, "sessionId": SESSION_ID}
+    # 최종적으로 반환되는 결과 오브젝트가 존재하면 함께 반환
     if resultData is not None:
-        response.update({"resultData": (model_to_dict(resultData))})
+        response.update({"resultData": resultData})
 
     return JsonResponse(response)
 
 
+# 전체 DB 생성 함수
 def createAllWelfareData(request):
     # DB classification 생성
     try:

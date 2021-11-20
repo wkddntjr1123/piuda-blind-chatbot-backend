@@ -13,5 +13,6 @@ urlpatterns = [
     path("", include(routers.urls)),
     path("bstest/", beautifulsoupTest),
     path("dftest/", dialogflowTest),
+    path("crolling/", crolling123GoKr),
     path("allDataUpdate/", createAllWelfareData),
 ]
