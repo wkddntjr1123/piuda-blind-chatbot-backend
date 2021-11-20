@@ -23,3 +23,11 @@ class Welfare(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class MinistryHealthWelfare(models.Model):
+    id = models.AutoField(primary_key=True)
+    category = models.CharField(max_length=20, default="", blank=True, null=False)
+    title = models.CharField(max_length=100, default="", blank=True, null=False)
+    contents = models.TextField(default="", blank=True, null=False)
+    createdDate = models.CharField(max_length=15, default="", blank=True, null=False)

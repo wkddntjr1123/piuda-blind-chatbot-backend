@@ -1,7 +1,7 @@
 from rest_framework import viewsets
 from config.settings import BASE_DIR
 from .serializers import WelfareSerializer
-from .models import Classification, Welfare
+from .models import Classification, MinistryHealthWelfare, Welfare
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -19,52 +19,46 @@ class WelfareViewSet(viewsets.ModelViewSet):
     serializer_class = WelfareSerializer
 
 
-# beautifulsoup 테스트
-def beautifulsoupTest(request):
-    # requirement : requests 패키지 (기본 내장인 urllib보다 깔끔한 듯), beautifulsoap4 패키지
-    url = "https://tcrosa.ichaward.org/gunsan/"
-
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        html = response.text
-        soup = bs(html, "html.parser")
-    else:
-        print(response.status_code)
-
-    crollingData = soup.select(".subject")
-
-    return JsonResponse({"crolling data": crollingData})
-
-
 # 보건복지부 보건복지상담센터 : FAQ 크롤링
 def crolling123GoKr(request):
-    # 보건의료
-    URL1 = "http://129.go.kr/faq/faq01.jsp"
-    # 사회복지
-    URL2 = "http://129.go.kr/faq/faq02.jsp"
-    # 인구아동
-    URL3 = "http://129.go.kr/faq/faq03.jsp"
-    # 위기대응
-    URL4 = "http://129.go.kr/faq/faq04.jsp"
-    # 노인장애인
-    URL5 = "http://129.go.kr/faq/faq05.jsp"
-    page = int(1)
-    queryParam = f"?page={page}&menu=1&tid=1&kind=0&table_id2=ZZZ"
-
-    response = requests.get(URL1 + queryParam)
-    if response.status_code == 200:
-        html = response.text
-        soup = bs(html, "html.parser")
-    else:
-        print(response.status_code)
-
-    crollingData = soup.select(".subject>a")
-    for item in crollingData:
-        print(item["href"])
-    # crollingData = soup.select_one(".grade-modal > div > .modal-content").text
-
-    return JsonResponse({"crolling data": "123"})
+    serverName = "http://129.go.kr"
+    # 대분류 : http://129.go.kr/faq/faq01.jsp ~ http://129.go.kr/faq/faq05.jsp
+    # 1:보건의료, 2:사회복지, 3:인구아동, 4:위기대응, 5:노인장애인
+    for urlNum in range(0, 5):
+        requestURL = serverName + f"/faq/faq0{urlNum+1}.jsp"
+        categoryDomain = ["보건의료", "사회복지", "인구아동", "위기대응", "노인장애인"]
+        category = categoryDomain[urlNum]
+        page = 1
+        while True:
+            queryParam = f"?page={page}"
+            response = requests.get(requestURL + queryParam)
+            html = response.text
+            soup = bs(html, "html.parser")
+            detailPageURLs = soup.select(".subject>a")
+            # 크롤링할 상세페이지가 없으면 탈출
+            if not detailPageURLs:
+                break
+            # 크롤링할 상세페이지가 있으면
+            for item in detailPageURLs:
+                # 각 상세페이지 get
+                requestDetailURL = serverName + item["href"]
+                detailResponse = requests.get(requestDetailURL)
+                detailHtml = detailResponse.text
+                detailSoup = bs(detailHtml, "html.parser")
+                title = detailSoup.select_one(".px>td").text
+                createdDate = detailSoup.find("th", text="작성일").find_next("td").text
+                contents = (
+                    detailSoup.select(".faq-tr")[1].select_one("td").text.strip().replace("\n", " ")
+                )
+                # db insert
+                MinistryHealthWelfare.objects.create(
+                    title=title,
+                    category=category,
+                    contents=contents,
+                    createdDate=createdDate,
+                )
+            page += 1
+    return JsonResponse({"crolling": "finished"})
 
 
 def detect_intent_texts(project_id, location_id, session_id, text, language_code):
@@ -84,9 +78,8 @@ def detect_intent_texts(project_id, location_id, session_id, text, language_code
     dict_response = Message.to_dict(response)
     fulfillment_text = dict_response.get("query_result").get("fulfillment_text")
 
-    query_response = None
     responseData = None
-    # "추천해드리는 복지 정보는 다음과 같습니다" => 결과오브젝트 함께 리턴
+    # 결과리턴 : "추천해드리는 복지 정보는 다음과 같습니다"
     if "추천" in fulfillment_text and "정보" in fulfillment_text:
         params = dict_response.get("query_result").get("output_contexts")[0].get("parameters")
         ageValue = params.get("age")[0]
