@@ -369,7 +369,7 @@ def dist_raw(v1, v2):
 
 @csrf_exempt
 def newNatural(request):
-    from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+    from sklearn.feature_extraction.text import TfidfVectorizer
 
     # from konlpy.tag import Okt
 
@@ -392,7 +392,6 @@ def newNatural(request):
             sentence = sentence + " " + word
         contents_for_vectorize.append(sentence)
     """
-    print("1단계 시작")
     contents_for_vectorize = [
         " 본인 부담 상 한 제 적용 제외 되는 항목 이 있나요 ?",
         " 현재 응급구조사 업무 에 종사 하고 있지 않습니다 . 저 도 자격 신고 대상 인가요 ?.",
@@ -2545,17 +2544,14 @@ def newNatural(request):
     X = vectorizer.fit_transform(contents_for_vectorize)
 
     num_samples, num_features = X.shape
-    print("1단계 끝")
-    # 벡터 유사도 비교할 문장
-    print("2단계 시작")
 
     new_post = [json.loads(request.body)["texts"]]
     # new_post_tokens = [t.nouns(row) for row in new_post]
-    from konlpy.tag import Komoran
+    from konlpy.tag import Mecab
 
-    kom = Komoran()
-    new_post_tokens = [kom.nouns(row) for row in new_post]
-    print(new_post_tokens)
+    m = Mecab(dicpath="C:/mecab/mecab-ko-dic")
+    # kom = Komoran()
+    new_post_tokens = [m.nouns(row) for row in new_post]
     new_post_for_vectorize = []
     for content in new_post_tokens:
         sentence = ""
@@ -2566,8 +2562,6 @@ def newNatural(request):
     # 다른 결과를 얻을 수 있음
     best_dist = 65535
     best_i = None
-    print("2단계 끝")
-    print("3단계 시작")
     for i in range(0, num_samples):
         post_vec = X.getrow(i)
         d = dist_raw(post_vec, new_post_vec)
@@ -2575,101 +2569,7 @@ def newNatural(request):
         if d < best_dist:
             best_dist = d
             best_i = i
-    print("3단계 끝")
     print("Best post is %i, dist = %.2f" % (best_i + 1, best_dist))
     # 최종 결과 오브젝트
     result = MinistryHealthWelfare.objects.get(id=best_i + 1).title
     return JsonResponse({"result": result})
-
-
-def naturalLanguageVectorSave(request):
-    from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-    from konlpy.tag import Okt
-    import scipy as sp
-
-    t = Okt()
-    # new_post 와 contents의 거리 구하는 함수 생성
-    def dist_raw(v1, v2):
-        delta = v1 - v2
-        return sp.linalg.norm(delta.toarray())
-
-    # tfidf 함수 생성, idf : log()문서 n이 너무 커질 수 있기 때문, TF-IDF는 TF와 IDF를 곱한 값을 의미 (return값!)
-    def tfidf(t, d, D):
-        tf = float(d.count(t)) / sum(d.count(w) for w in set(d))
-        idf = sp.log(float(len(D)) / (len([doc for doc in D if t in doc])))
-        return tf * idf
-
-    # scikit-learn 텍스트 특징(feature) 추출 모듈
-    vectorizer = CountVectorizer(min_df=1)
-    contents = [
-        "기초생활수급자일 경우 고등학교 졸업하고 대학교를 입학하지 않으면 생계급여 중지되나요?",
-        "가사간병서비스 제공계약서 작성시, 필수 사항이 있나요?",
-        "외국인 자녀도 영유아발달지원서비스 이용이 가능한가요?",
-    ]
-    vectorizer = TfidfVectorizer(min_df=1, decode_error="ignore")
-    contents_tokens = [t.morphs(row) for row in contents]
-
-    contents_for_vectorize = []
-
-    for content in contents_tokens:
-        sentence = ""
-        for word in content:
-            sentence = sentence + " " + word
-
-        contents_for_vectorize.append(sentence)
-
-    X = vectorizer.fit_transform(contents_for_vectorize)
-    num_samples, num_features = X.shape
-    num_samples, num_features
-    print(contents_for_vectorize)
-    print(X)
-    print(num_samples)
-
-    vectorizer.get_feature_names()
-
-    # test text 벡터화
-    # 형태소 분석 후 띄어쓰기로 구분하여 하나의 문장으로 만들기
-
-    new_post = ["외국인도 기초생활수급 대상자가 될 수 있나요."]
-    new_post_tokens = [t.morphs(row) for row in new_post]
-
-    new_post_for_vectorize = []
-
-    for content in new_post_tokens:
-        sentence = ""
-        for word in content:
-            sentence = sentence + " " + word
-
-        new_post_for_vectorize.append(sentence)
-
-    new_post_for_vectorize
-
-    # transform
-    new_post_vec = vectorizer.transform(new_post_for_vectorize)
-    print(type(new_post_vec))
-
-    # print(post_vec)
-
-    # 다른 결과를 얻을 수 있음
-    best_doc = None
-    best_dist = 65535
-    best_i = None
-
-    for i in range(0, num_samples):
-        post_vec = X.getrow(i)
-        print("++++++++++++++", X)
-        print("**********", post_vec)
-        # 함수호출
-        d = dist_raw(post_vec, new_post_vec)
-
-        print("== Post %i with dist=%.2f   : %s" % (i, d, contents[i]))
-
-        if d < best_dist:
-            best_dist = d
-            best_i = i
-
-    print("Best post is %i, dist = %.2f" % (best_i, best_dist))
-    print("-->", new_post)
-    print("---->", contents[best_i])
-
-    return JsonResponse({"success": True})

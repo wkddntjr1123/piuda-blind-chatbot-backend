@@ -1,6 +1,7 @@
 myvenv/
 db.sqlite3
 __pycache__/
+Python37/
 *.pyc
 credentials.json
 config/settings.py
