@@ -370,27 +370,8 @@ def dist_raw(v1, v2):
 @csrf_exempt
 def newNatural(request):
     from sklearn.feature_extraction.text import TfidfVectorizer
+    from konlpy.tag import Mecab
 
-    # from konlpy.tag import Okt
-
-    # t = Okt()
-
-    # 텍스트 특징 추출 모듈
-    # vectorizer = CountVectorizer(min_df=1)
-    """
-    contents = []
-    # 모든 복지 타이틀 contents
-    welfares = MinistryHealthWelfare.objects.all()
-    for welfare in welfares:
-        contents.append(welfare.title)
-    contents_tokens = [t.morphs(row) for row in contents]
-
-    contents_for_vectorize = []
-    for content in contents_tokens:
-        sentence = ""
-        for word in content:
-            sentence = sentence + " " + word
-        contents_for_vectorize.append(sentence)
     """
     contents_for_vectorize = [
         " 본인 부담 상 한 제 적용 제외 되는 항목 이 있나요 ?",
@@ -2539,6 +2520,19 @@ def newNatural(request):
         " 치매 안심 센터 의 쉼 터 프로그램 을 이용 하는 인지 지원 등급 수급 자도 주 야간 보호 이용 이 가능한가요 ?",
         " 기초 연금 을 신청 할 때 필요한 서류 는 무엇 인가요 ?",
     ]
+    """
+    m = Mecab(dicpath="C:/mecab/mecab-ko-dic")
+    contents = []
+    welfares = MinistryHealthWelfare.objects.all()
+    for welfare in welfares:
+        contents.append(welfare.title)
+    contents_tokens = [m.nouns(row) for row in contents]
+    contents_for_vectorize = []
+    for content in contents_tokens:
+        sentence = ""
+        for word in content:
+            sentence = sentence + " " + word
+        contents_for_vectorize.append(sentence)
     # 추출
     vectorizer = TfidfVectorizer(min_df=1, decode_error="ignore")
     X = vectorizer.fit_transform(contents_for_vectorize)
@@ -2546,11 +2540,6 @@ def newNatural(request):
     num_samples, num_features = X.shape
 
     new_post = [json.loads(request.body)["texts"]]
-    # new_post_tokens = [t.nouns(row) for row in new_post]
-    from konlpy.tag import Mecab
-
-    m = Mecab(dicpath="C:/mecab/mecab-ko-dic")
-    # kom = Komoran()
     new_post_tokens = [m.nouns(row) for row in new_post]
     new_post_for_vectorize = []
     for content in new_post_tokens:
@@ -2572,4 +2561,10 @@ def newNatural(request):
     print("Best post is %i, dist = %.2f" % (best_i + 1, best_dist))
     # 최종 결과 오브젝트
     result = MinistryHealthWelfare.objects.get(id=best_i + 1).title
-    return JsonResponse({"result": result})
+    return JsonResponse(
+        {
+            "result": result,
+            "new_post_for_vectorize": new_post_for_vectorize,
+            "contents_for_vectorize": contents_for_vectorize,
+        }
+    )
