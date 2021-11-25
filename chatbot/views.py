@@ -2521,7 +2521,8 @@ def newNatural(request):
         " 기초 연금 을 신청 할 때 필요한 서류 는 무엇 인가요 ?",
     ]
     """
-    m = Mecab(dicpath="C:/mecab/mecab-ko-dic")
+    # dicpath="C:/mecab/mecab-ko-dic"
+    m = Mecab()
     contents = []
     welfares = MinistryHealthWelfare.objects.all()
     for welfare in welfares:
