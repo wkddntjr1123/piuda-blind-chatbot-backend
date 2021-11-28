@@ -15,4 +15,5 @@ urlpatterns = [
     path("crolling/", crolling123GoKr),  # 보건복지상담센터 FAQ 크롤링 => DB저장
     path("allDataUpdate/", createAllWelfareData),  # 복지로 데이터 크롤링 => DB저장
     path("natural/", newNatural),  # 자연어 처리 벡터 => DB저장
+    path("elastic/", elasticTest),
 ]
