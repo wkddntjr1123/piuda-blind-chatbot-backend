@@ -1,17 +1,51 @@
+import json
 from elasticsearch import Elasticsearch, helpers
 from django.conf import settings
+
+"""
+초기 index 생성
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "nori": {
+          "tokenizer": "nori_tokenizer"
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "station": {
+        "type": "text",
+        "fields": {
+          "nori": {
+            "type": "text",
+            "analyzer": "nori"
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
 
 host = getattr(settings, "ELK_BASE_URL")
 es = Elasticsearch(host)
 
 """
-param
-    index : string => 인덱스이름
-    data : array => [item1, item2, ...] => 데이터 객체 배열
-    item : {"title":"","content":"",...} => 데이터 dict
-    }
+### ElasticSearch Bulk Insert ###
+
+@param
+    index : String  #인덱스이름
+    data : List => [item1, item2, ...]  #데이터 객체 배열
+    item : Dictionary => {"title":"","content":"",...}  #데이터 아이템dict
+@param
+
 """
-# bulk insert
+
+
 def bulkInsert(index, data):
     processedArray = []
     for item in data:
@@ -21,15 +55,44 @@ def bulkInsert(index, data):
 
 
 """
-param
-    index : string => 인덱스이름
-    keyword : string or list => list를 받으면 리스트의 각 아이템을 공백으로 합쳐서 string으로 변환
-    }
+### ElasticSearch Data Search ###
+@param
+    index : String  #검색할 인덱스 이름
+    keyword : String or List  #검색할 문장 or 키워드
+@return
+    results : Dictionary  #검색결과는 results["hits"]["hits"]에 List형태로 리턴
 """
 # search and return a most relevant object (제목으로 검색) / 리스트의 가장 앞에 있는 객체가 유사도가 제일 높은 객체
+# keyword로 list가 들어오면 공백이 있는 string으로 변환 후 검색
+# title에 가중치 1.2
 def searchByTitle(index, keyword):
     if isinstance(keyword, list):
         keyword = " ".join(keyword)
-    body = {"query": {"match": {"content": keyword}}}
+    body = json.dumps(
+        {
+            "query": {
+                "bool": {
+                    "should": [
+                        {"match": {"title": {"query": keyword, "boost": 1.2}}},
+                        {
+                            "match": {
+                                "contents": {
+                                    "query": keyword,
+                                }
+                            }
+                        },
+                        {
+                            "match_phrase": {
+                                "title": {
+                                    "query": keyword,
+                                    "boost": 2,
+                                }
+                            }
+                        },
+                    ]
+                }
+            }
+        }
+    )
     results = es.search(index=index, body=body)
-    return results
+    return results["hits"]["hits"]
