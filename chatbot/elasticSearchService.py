@@ -62,6 +62,54 @@ def bulkInsert(index, data):
 @return
     results : Dictionary  #검색결과는 results["hits"]["hits"]에 List형태로 리턴
 """
+
+# From 추천
+# age, area => 유사도 처리 필요X
+# interest => 유사도 처리 필요
+def searchFromRecommend(age, area, interest):
+    body = json.dumps(
+        {
+            "query": {
+                "bool": {
+                    "should": [
+                        {
+                            "match": {
+                                "age": {
+                                    "query": age,
+                                    "boost": 1,
+                                }
+                            }
+                        },
+                        {
+                            "match": {
+                                "area": {
+                                    "query": area,
+                                    "boost": 1,
+                                }
+                            }
+                        },
+                        {
+                            "match": {
+                                "interest": {
+                                    "query": interest,
+                                    "boost": 1,
+                                }
+                            }
+                        },
+                    ]
+                }
+            }
+        }
+    )
+    results = es.search(index="welfare", body=body)
+    return
+
+
+# From 검색
+def searchFromSearch():
+    return
+
+
 # search and return a most relevant object (제목으로 검색) / 리스트의 가장 앞에 있는 객체가 유사도가 제일 높은 객체
 # keyword로 list가 들어오면 공백이 있는 string으로 변환 후 검색
 # title에 가중치 1.2

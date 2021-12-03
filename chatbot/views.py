@@ -2,7 +2,7 @@ import json, os, time
 from config.settings import BASE_DIR
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from .models import Classification, MinistryHealthWelfare, Welfare
+from .models import MohwFaq, Bokjiro
 from bs4 import BeautifulSoup as bs
 import requests
 from google.cloud import dialogflow
@@ -10,24 +10,8 @@ from proto import Message
 from chatbot.elasticSearchService import searchByTitle
 
 
-# 전체 DB 생성 함수
-def createAllWelfareData(request):
-    # DB classification 생성
-    try:
-        if Classification.objects.get(name="central"):
-            pass
-    except Exception as e:
-        newClassification = Classification()
-        newClassification.name = "central"
-        newClassification.save()
-
-    try:
-        if Classification.objects.get(name="local"):
-            pass
-    except Exception as e:
-        newClassification = Classification()
-        newClassification.name = "local"
-        newClassification.save()
+# 복지로 사이트의 모든 복지정보 크롤링 => DB 저장
+def crollingAllBokjiro(request):
     # Request
     URL = "https://www.bokjiro.go.kr/ssis-teu/TWAT52005M/twataa/wlfareInfo/selectWlfareInfo.do"
     body = {
@@ -82,7 +66,7 @@ def createAllWelfareData(request):
         for item in centralData:
             id = item.get("WLFARE_INFO_ID", "")
             title = item.get("WLFARE_INFO_NM", "").replace(",", "/")
-            content = item.get("WLFARE_INFO_OUTL_CN", "")
+            contents = item.get("WLFARE_INFO_OUTL_CN", "").replace("&middot;", ",")
             address = item.get("ADDR", "")
             if address == " ":
                 address = ""
@@ -95,8 +79,8 @@ def createAllWelfareData(request):
             complexDict = {}
             for listItem in complexList:
                 complexDict.update({listItem.split(":")[0]: listItem.split(":")[1]})
-            interest = complexDict.get("INTRS_THEMA_CD", "").replace(",", "/")
-            family = complexDict.get("FMLY_CIRC_CD", "").replace(",", "/")
+            interest = complexDict.get("INTRS_THEMA_CD", "").replace(",", "/").replace("·", "")
+            family = complexDict.get("FMLY_CIRC_CD", "").replace(",", "/").replace("·", "/")
             lifecycle = complexDict.get("BKJR_LFTM_CYC_CD", "").replace(",", "/")
             ageText = complexDict.get("WLFARE_INFO_AGGRP_CD", "")
             age = ""
@@ -112,11 +96,11 @@ def createAllWelfareData(request):
                 age += "4"
             if "65" in ageText:
                 age += "5"
-            classification = Classification.objects.get(name="central")
+            classification = "중앙부처"
             dto = {
                 "id": id,
                 "title": title,
-                "content": content,
+                "contents": contents,
                 "interest": interest,
                 "family": family,
                 "lifecycle": lifecycle,
@@ -126,12 +110,12 @@ def createAllWelfareData(request):
                 "department": department,
                 "classification": classification,
             }
-            Welfare.objects.create(**dto)
+            Bokjiro.objects.create(**dto)
         # 지자체 데이터 DB화
         for item in localData:
             id = item.get("WLFARE_INFO_ID", "")
             title = item.get("WLFARE_INFO_NM", "").replace(",", "/")
-            content = item.get("WLFARE_INFO_OUTL_CN", "")
+            contents = item.get("WLFARE_INFO_OUTL_CN", "").replace("&middot;", ",")
             address = item.get("ADDR", "")
             if address == " ":
                 address = ""
@@ -144,8 +128,8 @@ def createAllWelfareData(request):
             complexDict = {}
             for listItem in complexList:
                 complexDict.update({listItem.split(":")[0]: listItem.split(":")[1]})
-            interest = complexDict.get("INTRS_THEMA_CD", "").replace(",", "/")
-            family = complexDict.get("FMLY_CIRC_CD", "").replace(",", "/")
+            interest = complexDict.get("INTRS_THEMA_CD", "").replace(",", "/").replace("·", "")
+            family = complexDict.get("FMLY_CIRC_CD", "").replace(",", "/").replace("·", "/")
             lifecycle = complexDict.get("BKJR_LFTM_CYC_CD", "").replace(",", "/")
             ageText = complexDict.get("WLFARE_INFO_AGGRP_CD", "")
             age = ""
@@ -161,11 +145,11 @@ def createAllWelfareData(request):
                 age += "4"
             if "65" in ageText:
                 age += "5"
-            classification = Classification.objects.get(name="local")
+            classification = "지자체"
             dto = {
                 "id": id,
                 "title": title,
-                "content": content,
+                "contents": contents,
                 "interest": interest,
                 "family": family,
                 "lifecycle": lifecycle,
@@ -175,14 +159,14 @@ def createAllWelfareData(request):
                 "department": department,
                 "classification": classification,
             }
-            Welfare.objects.create(**dto)
+            Bokjiro.objects.create(**dto)
         i = i + 1
-        time.sleep(1)
-    return JsonResponse({"...": "ㅠㅠ"})
+        time.sleep(0.1)
+    return JsonResponse({"success": True})
 
 
-# 보건복지부 보건복지상담센터 : FAQ 크롤링
-def crolling123GoKr(request):
+# 보건지부-복건복지상담센터 사이트의 모든 복지정보 크롤링 => DB 저장
+def crollingAllMohwFaq(request):
     serverName = "http://129.go.kr"
     # 대분류 : http://129.go.kr/faq/faq01.jsp ~ http://129.go.kr/faq/faq05.jsp
     # 1:보건의료, 2:사회복지, 3:인구아동, 4:위기대응, 5:노인장애인
@@ -196,7 +180,7 @@ def crolling123GoKr(request):
             response = requests.get(requestURL + queryParam)
             html = response.text
             soup = bs(html, "html.parser")
-            detailPageURLs = soup.select(".subject>a")
+            detailPageURLs = soup.select(".subject > a")
             # 크롤링할 상세페이지가 없으면 탈출
             if not detailPageURLs:
                 break
@@ -204,22 +188,31 @@ def crolling123GoKr(request):
             for item in detailPageURLs:
                 # 각 상세페이지 get
                 requestDetailURL = serverName + item["href"]
+                id = str(urlNum + 1) + "-" + str(requestDetailURL.split("?n=")[1])
                 detailResponse = requests.get(requestDetailURL)
                 detailHtml = detailResponse.text
                 detailSoup = bs(detailHtml, "html.parser")
-                title = detailSoup.select_one(".px>td").text
-                createdDate = detailSoup.find("th", text="작성일").find_next("td").text
-                contents = (
-                    detailSoup.select(".faq-tr")[1].select_one("td").text.strip().replace("\n", " ")
-                )
-                # db insert
-                MinistryHealthWelfare.objects.create(
-                    title=title,
-                    category=category,
-                    contents=contents,
-                    createdDate=createdDate,
-                )
+                try:
+                    title = detailSoup.select_one(".px > td").text
+                    createdDate = detailSoup.find("th", text="작성일").find_next("td").text
+                    contents = (
+                        detailSoup.select(".faq-tr")[1]
+                        .select_one("td")
+                        .text.strip()
+                        .replace("\n", " ")
+                    )
+                    # db insert
+                    MohwFaq.objects.create(
+                        id=id,
+                        title=title,
+                        category=category,
+                        contents=contents,
+                        createdDate=createdDate,
+                    )
+                except Exception as e:
+                    print(detailSoup)
             page += 1
+            time.sleep(0.1)
     return JsonResponse({"success": True})
 
 
@@ -242,7 +235,7 @@ def getDialogflowResult(project_id, location_id, session_id, text, language_code
     dict_response = Message.to_dict(response)
     fulfillment_text = dict_response.get("query_result").get("fulfillment_text")
     recent_intent = dict_response.get("query_result").get("intent").get("display_name")
-    params = dict_response.get("query_result").get("output_contexts")
+    params = dict_response.get("query_result").get("parameters")
 
     return fulfillment_text, recent_intent, params
 
@@ -269,12 +262,19 @@ def chatWithServer(request):
     )
     # 클라이언트에 응답할 데이터
     response = {"input texts": inputText, "result texts": result_texts, "sessionId": SESSION_ID}
+    print("*" * 100)
+    print(intent_name)
+    print(params)
+    print("*" * 100)
 
-    # 최종적으로 데이터 반환이 필요하면 : 추천의 최종 인텐트 이름 => "Recommend_F - custom - custom - yes"
+    # From 추천 : 최종결과 리턴 트리거 => 인텐트 이름 : "Recommend_F - custom - custom - yes"
+    # From 검색 : 최종결과 리턴 트리거 => 인텐트 이름 : "Search - custom"
     resultData = None
-    if intent_name == "Recommend_F - custom - custom - yes":
-        print("최종결과리턴해야해!")
+    if intent_name == "Recommend_F - custom2 - custom - yes":
+        print("추천 : 최종결과 트리거")
         # resultData = searchByTitle("welfare")
+    if intent_name == "Search - custom":
+        print("검색 : 최종결과 트리거")
 
     # 최종적으로 반환되는 결과 오브젝트가 존재하면 추가해서 반환
     if resultData is not None:
