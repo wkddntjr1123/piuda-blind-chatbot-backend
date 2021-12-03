@@ -2,37 +2,50 @@ import json
 from elasticsearch import Elasticsearch, helpers
 from django.conf import settings
 
-"""
-초기 index 생성
-{
-  "settings": {
-    "analysis": {
-      "analyzer": {
-        "nori": {
-          "tokenizer": "nori_tokenizer"
-        }
-      }
-    }
-  },
-  "mappings": {
-    "properties": {
-      "station": {
-        "type": "text",
-        "fields": {
-          "nori": {
-            "type": "text",
-            "analyzer": "nori"
-          }
-        }
-      }
-    }
-  }
-}
-"""
-
-
 host = getattr(settings, "ELK_BASE_URL")
 es = Elasticsearch(host)
+
+"""
+bokjiro index 생성
+{
+    "settings": {
+        "index": {
+            "analysis": {
+                "analyzer": {
+                    "korean": {
+                        "type": "custom",
+                        "tokenizer": "seunjeon"
+                    }
+                },
+                "tokenizer": {
+                    "seunjeon": {
+                        "user_words": ["캐구", "골구", "맥퀸"],
+                        "index_eojeol": "true",
+                        "index_poses": [
+                            "UNK",
+                            "EP",
+                            "I",
+                        ],
+                        "decompound": "true",
+                        "type": "seunjeon_tokenizer"
+                    }
+                }
+            }
+        }
+    },
+    "mappings": {
+        "properties": {
+            "name": {
+                "type": "text",
+                "analyzer": "korean"
+            },
+            "id": {
+              "type": "integer"
+            }
+        }
+    }
+}
+"""
 
 """
 ### ElasticSearch Bulk Insert ###
