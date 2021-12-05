@@ -43,6 +43,16 @@ def bulkInsert(index, data):
     bulkInsert("bokjiro", data)
 """
 
+### ElasticSearch document Insert ###
+#   @param
+#       index : String  #인덱스이름
+#       item : Dictionary => {"title":"","content":"",...}  #데이터 아이템 dict
+#   @param
+def documentInsert(index, item):
+    if index == "bokjiro":
+        es.index(index=index, doc_type="_doc", body=item)
+
+
 ### ElasticSearch 복지로 Search By Age, Area, Interest ###
 #   가중치 : age(6), area(1), interest(1)
 #
@@ -134,6 +144,16 @@ def searchBokjiroByParams(age, area, interest):
     return results["hits"]["hits"]
 
 
+# ElasticSearch document search by Id
+def searchById(index, id):
+    body = {"query": {"match": {"id": {"query": id}}}}
+    result = es.search(index=index, body=body)
+    if len(result["hits"]["hits"]):
+        return result["hits"]["hits"][0]
+    else:
+        return False
+
+
 ### ElasticSearch Keyword Search => From 검색 ###
 #   가중치 : title(1.2), contents(1)
 #   @param
@@ -205,163 +225,163 @@ def getPagedList(page, central, local, keyword):
 """
 mohw index 생성
 {
-	"settings": {
-		"index": {
-			"analysis": {
-				"analyzer": {
-					"korean": {
-						"type": "custom",
-						"tokenizer": "seunjeon"
-					}
-				},
-				"tokenizer": {
-					"seunjeon": {
-						"index_poses": [
-							"UNK",
-							"EP",
-							"I",
-							"J",
-							"M",
-							"N",
-							"SL",
-							"SH",
-							"SN",
-							"VCP",
-							"XP",
-							"XS",
-							"XR"
-						],
-						"type": "seunjeon_tokenizer"
-					}
-				}
-			}
-		}
-	},
-	"mappings": {
-		"properties": {
-			"id": {
-				"type": "keyword"
-			},
-			"category": {
-				"type": "keyword"
-			},
-			"title": {
-				"type": "text",
-				"analyzer": "korean"
-			},
-			"contents": {
-				"type": "text",
-				"analyzer": "korean"
-			},
-			"created_date":{
-				"type" : "keyword"
-			},
-			"inserted_date": {
-				"type": "date",
-				"format": "yyyy-mm-dd"
-			}
-		}
-	}
+  "settings": {
+    "index": {
+      "analysis": {
+        "analyzer": {
+          "korean": {
+            "type": "custom",
+            "tokenizer": "seunjeon"
+          }
+        },
+        "tokenizer": {
+          "seunjeon": {
+            "index_poses": [
+              "UNK",
+              "EP",
+              "I",
+              "J",
+              "M",
+              "N",
+              "SL",
+              "SH",
+              "SN",
+              "VCP",
+              "XP",
+              "XS",
+              "XR"
+            ],
+            "type": "seunjeon_tokenizer"
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "keyword"
+      },
+      "category": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "korean"
+      },
+      "contents": {
+        "type": "text",
+        "analyzer": "korean"
+      },
+      "created_date":{
+        "type" : "keyword"
+      },
+      "inserted_date": {
+        "type": "date",
+        "format": "yyyy-mm-dd"
+      }
+    }
+  }
 }
 """
 
 """
 bokjiro index 생성
 {
-	"settings": {
-		"index": {
-			"analysis": {
-				"analyzer": {
-					"korean": {
-						"type": "custom",
-						"tokenizer": "seunjeon"
-					},
-					"spliter": {
-						"tokenizer": "split_tokenizer"
-					},
-					"ngram_one": {
-						"tokenizer": "ngram_tokenizer"
-					}
-				},
-				"tokenizer": {
-					"seunjeon": {
-						"index_poses": [
-							"UNK",
-							"EP",
-							"I",
-							"J",
-							"M",
-							"N",
-							"SL",
-							"SH",
-							"SN",
-							"VCP",
-							"XP",
-							"XS",
-							"XR"
-						],
-						"type": "seunjeon_tokenizer"
-					},
-					"split_tokenizer": {
-						"type": "simple_pattern_split",
-						"pattern": "/"
-					},
-					"ngram_tokenizer": {
-						"type": "ngram",
-						"min_gram": "1",
-						"max_gram": "1"
-					}
-				}
-			}
-		}
-	},
-	"mappings": {
-		"properties": {
-			"id": {
-				"type": "keyword"
-			},
-			"classification": {
-				"type": "keyword"
-			},
-			"title": {
-				"type": "text",
-				"analyzer": "korean"
-			},
-			"contents": {
-				"type": "text",
-				"analyzer": "korean"
-			},
-			"interest": {
-				"type": "text",
-				"analyzer": "spliter"
-			},
-			"family": {
-				"type": "text",
-				"analyzer": "spliter"
-			},
-			"lifecycle": {
-				"type": "text",
-				"analyzer": "spliter"
-			},
-			"age": {
-				"type": "text",
-				"analyzer": "ngram_one"
-			},
-			"address": {
-				"type": "text",
-				"analyzer": "korean"
-			},
-			"phone": {
-				"type": "keyword"
-			},
-			"department": {
-				"type": "keyword"
-			},
-			"inserted_date": {
-				"type": "date",
-				"format": "yyyy-mm-dd"
-			}
-		}
-	}
+  "settings": {
+    "index": {
+      "analysis": {
+        "analyzer": {
+          "korean": {
+            "type": "custom",
+            "tokenizer": "seunjeon"
+          },
+          "spliter": {
+            "tokenizer": "split_tokenizer"
+          },
+          "ngram_one": {
+            "tokenizer": "ngram_tokenizer"
+          }
+        },
+        "tokenizer": {
+          "seunjeon": {
+            "index_poses": [
+              "UNK",
+              "EP",
+              "I",
+              "J",
+              "M",
+              "N",
+              "SL",
+              "SH",
+              "SN",
+              "VCP",
+              "XP",
+              "XS",
+              "XR"
+            ],
+            "type": "seunjeon_tokenizer"
+          },
+          "split_tokenizer": {
+            "type": "simple_pattern_split",
+            "pattern": "/"
+          },
+          "ngram_tokenizer": {
+            "type": "ngram",
+            "min_gram": "1",
+            "max_gram": "1"
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "keyword"
+      },
+      "classification": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "korean"
+      },
+      "contents": {
+        "type": "text",
+        "analyzer": "korean"
+      },
+      "interest": {
+        "type": "text",
+        "analyzer": "spliter"
+      },
+      "family": {
+        "type": "text",
+        "analyzer": "spliter"
+      },
+      "lifecycle": {
+        "type": "text",
+        "analyzer": "spliter"
+      },
+      "age": {
+        "type": "text",
+        "analyzer": "ngram_one"
+      },
+      "address": {
+        "type": "text",
+        "analyzer": "korean"
+      },
+      "phone": {
+        "type": "keyword"
+      },
+      "department": {
+        "type": "keyword"
+      },
+      "inserted_date": {
+        "type": "date",
+        "format": "yyyy-mm-dd"
+      }
+    }
+  }
 }
 """

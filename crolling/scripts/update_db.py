@@ -1,5 +1,7 @@
 import json, requests, time
+from chatbot.elasticSearchService import documentInsert
 from chatbot.models import Bokjiro
+from elasticsearch import Elasticsearch
 
 
 def run():
@@ -156,6 +158,21 @@ def run():
         # DB에 데이터가 존재하는지 비교 : 만약 없다면 객체 저장
         for item in items:
             if not Bokjiro.objects.filter(id=item["id"]).exists():
-                Bokjiro.objects.create(item)
+                insertedObject = Bokjiro.objects.create(item)
+                dtoForElasticsearch = {
+                    "id": insertedObject.id,
+                    "title": insertedObject.title,
+                    "contents": insertedObject.contents,
+                    "interest": insertedObject.interest,
+                    "family": insertedObject.family,
+                    "lifecycle": insertedObject.lifecycle,
+                    "age": insertedObject.age,
+                    "address": insertedObject.address,
+                    "phone": insertedObject.phone,
+                    "department": insertedObject.department,
+                    "classification": insertedObject.classification,
+                    "inserted_date": item.db_inserted_date,
+                }
+                documentInsert("bokjiro", dtoForElasticsearch)
         i = i + 1
         time.sleep(0.25)

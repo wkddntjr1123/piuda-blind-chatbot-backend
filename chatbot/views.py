@@ -57,18 +57,19 @@ def chatWithServer(request):
     response = {"input texts": inputText, "result texts": result_texts, "sessionId": SESSION_ID}
 
     # From 추천 : 최종결과 리턴 트리거 => 인텐트 이름 : "Recommend_F - custom - custom - yes"
-    # From 검색 : 최종결과 리턴 트리거 => 인텐트 이름 : "Search - custom"
+
     resultData = None
     if intent_name == "Recommend_F - custom2 - custom - yes":
         resultData = searchBokjiroByParams(params["age"], params["area"], params["interest"])
         if not len(resultData):
             response["result texts"] = "일치하는 복지 결과가 없습니다. 010-5105-6656으로 연결할까요?"
-            resultData = False
+            resultData = None
+    # From 검색 : 최종결과 리턴 트리거 => 인텐트 이름 : "Search - custom"
     if intent_name == "Search - custom":
-        if params["any"]:
+        if len(params["any"]):
             keyword = " ".join(params["any"])
-        if params["Others"]:
-            keyword = params["Others"]
+        if len(params["Others"]):
+            keyword = " ".join(params["Others"])
         resultData = searchBykeyword("bokjiro", keyword)
 
     # 최종적으로 반환되는 결과 오브젝트가 존재하면 추가해서 반환
@@ -87,3 +88,10 @@ def pagedBokjiroList(request):
     results = getPagedList(page, central, local, keyword)
 
     return JsonResponse(results, safe=False)
+
+
+@csrf_exempt
+# 복지정보 detail 정보 return
+def bokjoroDetail(request, id):
+    result = searchById("bokjiro", id)
+    return JsonResponse(result, safe=False)
